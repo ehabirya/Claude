@@ -1,5 +1,5 @@
-# Use RunPod's base Python image
-FROM runpod/base:0.4.0-cuda11.8.0
+# Use Python base image (CPU only)
+FROM python:3.10-slim
 
 # Set working directory
 WORKDIR /app
