@@ -563,4 +563,132 @@
 
             const btn = document.getElementById('generateBtn');
             btn.innerHTML = '<div class="spinner"></div> Generating Digital Twin...';
-            btn.disabled =
+            btn.disabled =btn.disabled = true;
+
+            try {
+                const response = await fetch(apiEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${apiKey}`
+                    },
+                    body: JSON.stringify({
+                        input: {
+                            action: 'generate_twin',
+                            photos: photoData,
+                            measurements: measurements
+                        }
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showSuccessResult(result);
+                } else {
+                    showResult('error', result.error || 'Failed to generate digital twin');
+                }
+            } catch (error) {
+                showResult('error', `Error: ${error.message}`);
+            } finally {
+                btn.innerHTML = '🎯 Generate Digital Twin';
+                btn.disabled = false;
+            }
+        });
+
+        function showResult(type, message) {
+            const section = document.getElementById('resultSection');
+            const content = document.getElementById('resultContent');
+            
+            section.style.display = 'block';
+            
+            if (type === 'success') {
+                content.innerHTML = `<div class="success-message">${message}</div>`;
+            } else {
+                content.innerHTML = `<div class="error-message">${message}</div>`;
+            }
+
+            section.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function showSuccessResult(result) {
+            const section = document.getElementById('resultSection');
+            const content = document.getElementById('resultContent');
+            
+            section.style.display = 'block';
+            
+            const stats = result.statistics;
+            
+            content.innerHTML = `
+                <div class="success-message">
+                    <strong>✓ Digital Twin Generated Successfully!</strong>
+                </div>
+                
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-value">${stats.num_vertices}</div>
+                        <div class="stat-label">Vertices</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">${stats.num_faces}</div>
+                        <div class="stat-label">Faces</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">${stats.num_matches}</div>
+                        <div class="stat-label">Matches</div>
+                    </div>
+                </div>
+
+                <div style="margin-top: 20px;">
+                    <button onclick="downloadMesh('${result.mesh_obj_base64}')" 
+                            style="width: 100%; padding: 15px; background: #28a745; color: white; 
+                                   border: none; border-radius: 10px; font-size: 16px; cursor: pointer;">
+                        📥 Download OBJ File
+                    </button>
+                </div>
+
+                <div style="margin-top: 15px; padding: 15px; background: #e9ecef; border-radius: 10px;">
+                    <strong>📋 Integration Code for Flutter:</strong>
+                    <pre style="background: #fff; padding: 15px; border-radius: 5px; overflow-x: auto; margin-top: 10px; font-size: 12px;">
+final response = await http.post(
+  Uri.parse('${document.getElementById('apiEndpoint').value}'),
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer YOUR_API_KEY',
+  },
+  body: jsonEncode({
+    'input': {
+      'action': 'generate_twin',
+      'photos': [photo1Base64, photo2Base64, photo3Base64],
+      'measurements': {
+        'height': ${stats.num_vertices > 0 ? document.getElementById('height').value : 170},
+        'weight': ${stats.num_vertices > 0 ? document.getElementById('weight').value : 70},
+        'shoulderWidth': ${stats.num_vertices > 0 ? document.getElementById('shoulder').value : 40},
+        'chestCircumference': ${stats.num_vertices > 0 ? document.getElementById('chest').value : 90},
+        'waistCircumference': ${stats.num_vertices > 0 ? document.getElementById('waist').value : 80},
+        'hipCircumference': ${stats.num_vertices > 0 ? document.getElementById('hips').value : 95},
+      }
+    }
+  }),
+);</pre>
+                </div>
+            `;
+
+            section.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function downloadMesh(base64Data) {
+            const objData = atob(base64Data);
+            const blob = new Blob([objData], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'digital_twin.obj';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
