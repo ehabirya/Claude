@@ -24,5 +24,5 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy application code
 COPY runpod_handler.py .
 
-# Set the handler
+# Set the handlers
 CMD ["python", "-u", "runpod_handler.py"]
