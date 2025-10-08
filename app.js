@@ -12,10 +12,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function getCreds() {
     return {
-      // You may put either:
-      //  - https://api.runpod.ai/v2/<ENDPOINT_ID>
-      //  - https://api.runpod.ai/v2/<ENDPOINT_ID>/run
-      //  - https://api.runpod.ai/v2/<ENDPOINT_ID>/runsync
       apiEndpoint: normalizeEndpoint(document.getElementById('apiEndpoint')?.value),
       apiKey: (document.getElementById('apiKey')?.value || '').trim(),
     };
@@ -35,12 +31,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function parseRunpodResponse(raw) {
-    // When job completes, RunPod hands back { output: ... } or { output:[{output:...}] }
     return raw?.output?.[0]?.output ?? raw?.output ?? raw;
   }
 
   function extractJobId(raw) {
-    // Be liberal in what we accept
     return raw?.id || raw?.jobId || raw?.requestId || raw?.output?.id || raw?.[0]?.id || null;
   }
 
@@ -48,7 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function pollStatus(statusUrl, jobId, apiKey, opts = {}) {
     const {
-      timeoutMs = 180000,   // 3 minutes
+      timeoutMs = 180000,
       startDelayMs = 800,
       maxDelayMs = 3000,
     } = opts;
@@ -73,7 +67,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const json = await res.json();
       const status = json?.status || json?.state || json?.job?.status;
-      // When completed, the final payload is usually under "output"
       if (status === 'COMPLETED' || status === 'SUCCEEDED' || status === 'SUCCESS') {
         return parseRunpodResponse(json);
       }
@@ -82,7 +75,6 @@ document.addEventListener('DOMContentLoaded', () => {
         throw new Error(msg);
       }
 
-      // IN_QUEUE / IN_PROGRESS: backoff and continue
       await wait(delay);
       delay = Math.min(maxDelayMs, Math.round(delay * 1.5));
     }
@@ -101,7 +93,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btn) btn.disabled = !allPhotosUploaded || !apiEndpoint || !apiKey;
   }
 
-  // Resize image client-side to keep payloads small and quality consistent
   function fileToResizedDataURL(file, maxSide = 1280, mime = 'image/jpeg', quality = 0.85) {
     return new Promise((resolve, reject) => {
       const img = new Image();
@@ -185,7 +176,6 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   window.showResult = showResult;
 
-  let threeCtx = null;
   function loadScript(src) {
     return new Promise((resolve, reject) => {
       const s = document.createElement('script');
@@ -249,8 +239,6 @@ document.addEventListener('DOMContentLoaded', () => {
         camera.aspect = w2 / h;
         camera.updateProjectionMatrix();
       });
-
-      threeCtx = { scene, camera, renderer, obj };
     };
 
     if (window.THREE && window.THREE.OBJLoader) {
