@@ -313,3 +313,158 @@ function downloadMesh(base64Data) {
   URL.revokeObjectURL(url);
 }
 </script>
+<script>
+/* ---------- Small helpers shared by both buttons ---------- */
+function parseRunpodResponse(raw) {
+  // Works for /runsync, /run (+status wrapper), or plain handler returns
+  // - { output: {...} }
+  // - { output: [ { output: {...} } ] }
+  // - { ...direct payload... }
+  return raw?.output?.[0]?.output ?? raw?.output ?? raw;
+}
+const asArray = v => Array.isArray(v) ? v : [];
+
+function normalizeEndpoint(url) { return (url || '').trim().replace(/\/+$/,''); }
+function getCreds() {
+  return {
+    apiEndpoint: normalizeEndpoint(document.getElementById('apiEndpoint').value),
+    apiKey: (document.getElementById('apiKey').value || '').trim()
+  };
+}
+
+/* (optional) clear previous badges without removing the uploaded image */
+function clearQualityUI() {
+  for (let i = 1; i <= 3; i++) {
+    const card = document.getElementById(`card${i}`);
+    const preview = document.getElementById(`preview${i}`);
+    card.classList.remove('quality-bad');
+    const img = preview.querySelector('img.preview-image');
+    preview.innerHTML = '';
+    if (img) preview.appendChild(img);
+  }
+}
+
+/* ---------- ANALYZE button (robust) ---------- */
+document.getElementById('analyzeBtn').addEventListener('click', async () => {
+  const { apiEndpoint, apiKey } = getCreds();
+  // IMPORTANT: for blocking responses use /runsync at the end of the URL
+  if (!/^https?:\/\//i.test(apiEndpoint) || !apiKey) {
+    alert('Please enter a valid RunPod API endpoint (https://.../runsync) and API key');
+    return;
+  }
+  const uploadedPhotos = photoData.filter(p => p !== null);
+  if (uploadedPhotos.length === 0) {
+    alert('Please upload at least one photo');
+    return;
+  }
+
+  const btn = document.getElementById('analyzeBtn');
+  btn.innerHTML = '<div class="spinner"></div> Analyzing...';
+  btn.disabled = true;
+  clearQualityUI();
+
+  try {
+    for (let i = 0; i < 3; i++) {
+      if (!photoData[i]) continue;
+
+      const response = await fetch(apiEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({ input: { action: 'analyze_photo', photo: photoData[i] } })
+      });
+
+      const raw = await response.json();
+      const result = parseRunpodResponse(raw);
+      console.log('Analyze response:', raw, 'parsed:', result);
+
+      const card = document.getElementById(`card${i+1}`);
+      const preview = document.getElementById(`preview${i+1}`);
+
+      if (result?.error || typeof result?.is_good === 'undefined') {
+        card.classList.add('quality-bad');
+        const msg = result?.error || 'Unexpected response format.';
+        preview.innerHTML += `
+          <span class="quality-badge quality-bad">✗ Error</span>
+          <div class="quality-issues">${msg}</div>
+        `;
+        continue;
+      }
+
+      const issues = asArray(result.issues);
+      if (result.is_good) {
+        card.classList.remove('quality-bad');
+        preview.innerHTML += `<span class="quality-badge quality-good">✓ Good Quality</span>`;
+      } else {
+        card.classList.add('quality-bad');
+        const issuesHtml = issues.map(x => `• ${x}`).join('<br>');
+        preview.innerHTML += `
+          <span class="quality-badge quality-bad">✗ Quality Issues</span>
+          <div class="quality-issues">${issuesHtml}</div>
+        `;
+      }
+    }
+
+    showResult('success', 'Photo quality analysis complete!');
+  } catch (err) {
+    showResult('error', `Error analyzing photos: ${err.message}`);
+  } finally {
+    btn.innerHTML = '🔍 Analyze Photo Quality';
+    btn.disabled = false;
+  }
+});
+
+/* ---------- GENERATE button (robust) ---------- */
+document.getElementById('generateBtn').addEventListener('click', async () => {
+  const { apiEndpoint, apiKey } = getCreds();
+  // IMPORTANT: for blocking responses use /runsync at the end of the URL
+  if (!/^https?:\/\//i.test(apiEndpoint) || !apiKey) {
+    alert('Please enter a valid RunPod API endpoint (https://.../runsync) and API key');
+    return;
+  }
+
+  const measurements = {
+    height: parseInt(document.getElementById('height').value),
+    weight: parseInt(document.getElementById('weight').value),
+    shoulderWidth: parseInt(document.getElementById('shoulder').value),
+    chestCircumference: parseInt(document.getElementById('chest').value),
+    waistCircumference: parseInt(document.getElementById('waist').value),
+    hipCircumference: parseInt(document.getElementById('hips').value)
+  };
+
+  const btn = document.getElementById('generateBtn');
+  btn.innerHTML = '<div class="spinner"></div> Generating Digital Twin...';
+  btn.disabled = true;
+
+  try {
+    const response = await fetch(apiEndpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        input: { action: 'generate_twin', photos: photoData, measurements }
+      })
+    });
+
+    const raw = await response.json();
+    const result = parseRunpodResponse(raw);
+    console.log('Generate response:', raw, 'parsed:', result);
+
+    if (result?.success) {
+      showSuccessResult(result);
+    } else {
+      const message = result?.error || 'Failed to generate digital twin.';
+      showResult('error', message);
+    }
+  } catch (err) {
+    showResult('error', `Error: ${err.message}`);
+  } finally {
+    btn.innerHTML = '🎯 Generate Digital Twin';
+    btn.disabled = false;
+  }
+});
+</script>
