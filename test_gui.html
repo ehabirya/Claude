@@ -94,9 +94,32 @@ document.getElementById('apiEndpoint').addEventListener('input', updateGenerateB
 document.getElementById('apiKey').addEventListener('input', updateGenerateButton);
 </script>
 <script>
-/* -------------------------------------------------------
-   🔍 Analyze & Generate Handlers
-------------------------------------------------------- */
+function parseRunpodResponse(raw) {
+  // Works for /run, /runsync, and plain handler returns
+  return raw?.output?.[0]?.output ?? raw?.output ?? raw;
+}
+
+function normalizeAnalyzeResult(res) {
+  // Handler success shape
+  if (typeof res?.is_good !== 'undefined') {
+    return {
+      ok: true,
+      is_good: !!res.is_good,
+      // always an array so .map() is safe
+      issues: Array.isArray(res.issues) ? res.issues : [],
+      metrics: res.metrics || {}
+    };
+  }
+  // Handler error shape
+  if (res?.error) {
+    return { ok: false, error: String(res.error) };
+  }
+  // Async status shape
+  if (res?.status && res.status !== 'COMPLETED') {
+    return { ok: false, error: `Job status: ${res.status}` };
+  }
+  return { ok: false, error: 'Unexpected response format from server.' };
+}
 
 document.getElementById('analyzeBtn').addEventListener('click', async () => {
   const { apiEndpoint, apiKey } = getCreds();
@@ -135,20 +158,32 @@ document.getElementById('analyzeBtn').addEventListener('click', async () => {
       });
 
       const raw = await response.json();
-      const result = raw.output?.[0]?.output ?? raw.output ?? raw;
-      qualityResults[i] = result;
+      const parsed = parseRunpodResponse(raw);
+      console.log('Analyze raw:', raw, 'parsed:', parsed); // helpful debugging
+
+      const norm = normalizeAnalyzeResult(parsed);
+      qualityResults[i] = norm;
 
       const card = document.getElementById(`card${i + 1}`);
       const preview = document.getElementById(`preview${i + 1}`);
 
-      if (result.is_good) {
+      if (!norm.ok) {
+        card.classList.add('quality-bad');
+        preview.innerHTML += `
+          <span class="quality-badge quality-bad">✗ Error</span>
+          <div class="quality-issues">${norm.error}</div>
+        `;
+        continue;
+      }
+
+      if (norm.is_good) {
         card.classList.remove('quality-bad');
         preview.innerHTML += `
           <span class="quality-badge quality-good">✓ Good Quality</span>
         `;
       } else {
         card.classList.add('quality-bad');
-        const issuesHtml = result.issues.map(issue => `• ${issue}`).join('<br>');
+        const issuesHtml = norm.issues.map(issue => `• ${issue}`).join('<br>');
         preview.innerHTML += `
           <span class="quality-badge quality-bad">✗ Quality Issues</span>
           <div class="quality-issues">${issuesHtml}</div>
@@ -161,58 +196,6 @@ document.getElementById('analyzeBtn').addEventListener('click', async () => {
     showResult('error', `Error analyzing photos: ${error.message}`);
   } finally {
     btn.innerHTML = '🔍 Analyze Photo Quality';
-    btn.disabled = false;
-  }
-});
-
-document.getElementById('generateBtn').addEventListener('click', async () => {
-  const { apiEndpoint, apiKey } = getCreds();
-  if (!apiEndpoint || !/^https?:\/\//i.test(apiEndpoint) || !apiKey) {
-    alert('Please enter a valid RunPod API endpoint (https://...) and API key');
-    return;
-  }
-
-  const measurements = {
-    height: parseInt(document.getElementById('height').value),
-    weight: parseInt(document.getElementById('weight').value),
-    shoulderWidth: parseInt(document.getElementById('shoulder').value),
-    chestCircumference: parseInt(document.getElementById('chest').value),
-    waistCircumference: parseInt(document.getElementById('waist').value),
-    hipCircumference: parseInt(document.getElementById('hips').value)
-  };
-
-  const btn = document.getElementById('generateBtn');
-  btn.innerHTML = '<div class="spinner"></div> Generating Digital Twin...';
-  btn.disabled = true;
-
-  try {
-    const response = await fetch(apiEndpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        input: {
-          action: 'generate_twin',
-          photos: photoData,
-          measurements: measurements
-        }
-      })
-    });
-
-    const raw = await response.json();
-    const result = raw.output?.[0]?.output ?? raw.output ?? raw;
-
-    if (result.success) {
-      showSuccessResult(result);
-    } else {
-      showResult('error', result.error || 'Failed to generate digital twin');
-    }
-  } catch (error) {
-    showResult('error', `Error: ${error.message}`);
-  } finally {
-    btn.innerHTML = '🎯 Generate Digital Twin';
     btn.disabled = false;
   }
 });
