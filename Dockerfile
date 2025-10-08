@@ -3,7 +3,6 @@
 # With MediaPipe for body pose detection
 # =============================================================================
 FROM python:3.10-slim-bookworm
-FROM python:3.10
 # Environment: faster startup, cleaner images, tame BLAS threads
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
