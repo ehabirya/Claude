@@ -4,6 +4,7 @@
 # runpod==1.6.2, numpy==1.24.3, opencv-python-headless==4.8.1.78,
 # Pillow==10.1.0, trimesh==4.0.5, scipy==1.11.4
 # =============================================================================
+FROM python:3.10
 FROM python:3.10-slim-bookworm
 
 # Environment: faster startup, cleaner images, tame BLAS threads
