@@ -1,5 +1,10 @@
 """
 RunPod Serverless Handler for Digital Twin Generation
+- Robust image decode (EXIF, resize)
+- Quality checks
+- Feature extraction with skin mask (wider ranges)
+- Fallback to edge features when skin is scarce (e.g., back view)
+- More tolerant matching and lower minimum match threshold
 """
 
 from __future__ import annotations
@@ -23,13 +28,15 @@ MIN_BRIGHTNESS = 80.0
 MAX_BRIGHTNESS = 200.0
 MIN_SHARPNESS = 100.0
 
-MAX_IMAGE_DIM = 1280  # resize larger photos to this max side
-MAX_CORNERS = 400     # hard cap to keep matching fast
-PATCH_RADIUS = 2      # 5x5 descriptor
-MATCH_Y_TOL = 0.10
-MATCH_DIST_MAX = 50.0
-MIN_MATCHES = 20
+MAX_IMAGE_DIM = 1280   # resize larger photos to this max side
+MAX_CORNERS = 600      # was 400
+PATCH_RADIUS = 3       # 7x7 descriptor (was 2 => 5x5)
+MATCH_Y_TOL = 0.20     # was 0.10
+MATCH_DIST_MAX = 60.0  # was 50.0
+MIN_MATCHES = 12       # was 20
 SMOOTH_ITERS = 3
+
+PERSON_MIN = 30        # if fewer "person" features than this, fall back to all features
 # ----------------------------------
 
 logging.basicConfig(level=logging.INFO)
@@ -84,10 +91,24 @@ class PhotoQualityAnalyzer:
 class PersonFeatureDetector:
     @staticmethod
     def detect_skin_mask(image_array: np.ndarray) -> np.ndarray:
+        """
+        Wider skin detection that works better across tones + HSV fallback.
+        """
+        # YCrCb range (wider than classic thresholds)
         ycrcb = cv2.cvtColor(image_array, cv2.COLOR_BGR2YCrCb)
-        lower = np.array([0, 133, 77], dtype=np.uint8)
-        upper = np.array([255, 173, 127], dtype=np.uint8)
-        return cv2.inRange(ycrcb, lower, upper)
+        lower_ycc = np.array([0, 120, 60], dtype=np.uint8)
+        upper_ycc = np.array([255, 180, 140], dtype=np.uint8)
+        mask_ycc = cv2.inRange(ycrcb, lower_ycc, upper_ycc)
+
+        # HSV fallback band for lighter/redder skin regions
+        hsv = cv2.cvtColor(image_array, cv2.COLOR_BGR2HSV)
+        lower_hsv = np.array([0, 10, 40], dtype=np.uint8)
+        upper_hsv = np.array([25, 255, 255], dtype=np.uint8)
+        mask_hsv = cv2.inRange(hsv, lower_hsv, upper_hsv)
+
+        mask = cv2.bitwise_or(mask_ycc, mask_hsv)
+        mask = cv2.medianBlur(mask, 5)
+        return mask
 
     @staticmethod
     def extract_features(image_array: np.ndarray) -> List[Dict[str, Any]]:
@@ -130,8 +151,17 @@ class PersonFeatureDetector:
 class FeatureMatcher:
     @staticmethod
     def match(features1: List[Dict[str, Any]], features2: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        f1 = [f for f in features1 if f["type"] == "person"]
-        f2 = [f for f in features2 if f["type"] == "person"]
+        """
+        Try matching "person"-typed features first; if too few, fall back to all.
+        Uses vectorized L2 on small 7x7 patch descriptors with relaxed row tolerance.
+        """
+        # Prefer person features
+        p1 = [f for f in features1 if f["type"] == "person"]
+        p2 = [f for f in features2 if f["type"] == "person"]
+
+        # Fallback to all features if not enough skin points (e.g., back view with covered skin)
+        f1 = p1 if len(p1) >= PERSON_MIN else features1
+        f2 = p2 if len(p2) >= PERSON_MIN else features2
         if not f1 or not f2:
             return []
 
@@ -142,22 +172,20 @@ class FeatureMatcher:
         y1 = np.array([f["y"] for f in f1], dtype=np.float32)[:, None]
         y2 = np.array([f["y"] for f in f2], dtype=np.float32)[None, :]
         y_ok = np.abs(y1 - y2) < MATCH_Y_TOL
-
-        matches: List[Dict[str, Any]] = []
         if not y_ok.any():
-            return matches
+            return []
 
         dists = np.linalg.norm(A[:, None, :] - B[None, :, :], axis=2)
         dists[~y_ok] = np.inf
 
-        best_idx2 = np.argmin(dists, axis=1)
-        best_dist = dists[np.arange(dists.shape[0]), best_idx2]
+        best_j = np.argmin(dists, axis=1)
+        best_d = dists[np.arange(dists.shape[0]), best_j]
 
-        for i, j in enumerate(best_idx2):
-            dist = float(best_dist[i])
-            if not math.isfinite(dist) or dist >= MATCH_DIST_MAX:
-                continue
-            matches.append({"point1": f1[i], "point2": f2[j], "distance": dist})
+        matches: List[Dict[str, Any]] = []
+        for i, j in enumerate(best_j):
+            dist = float(best_d[i])
+            if np.isfinite(dist) and dist < MATCH_DIST_MAX:
+                matches.append({"point1": f1[i], "point2": f2[j], "distance": dist})
         return matches
 
 
