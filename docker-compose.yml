@@ -1,0 +1,65 @@
+#Full local testing environment
+version: '3.8'
+
+services:
+  digital-twin:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - BUILDKIT_INLINE_CACHE=1
+    image: digital-twin:latest
+    container_name: digital-twin-handler
+    
+    environment:
+      # RunPod environment (set your actual key)
+      - RUNPOD_API_KEY=${RUNPOD_API_KEY:-test-key}
+      - RUNPOD_ENDPOINT_ID=${RUNPOD_ENDPOINT_ID:-test-endpoint}
+      
+      # Performance tuning
+      - OMP_NUM_THREADS=2
+      - OPENBLAS_NUM_THREADS=2
+      - MKL_NUM_THREADS=2
+      
+      # Debug mode (optional)
+      - LOG_LEVEL=INFO
+    
+    volumes:
+      # Mount test data (optional)
+      - ./test_data:/app/test_data:ro
+      
+      # Mount logs
+      - ./logs:/app/logs
+    
+    # Resource limits
+    mem_limit: 4g
+    cpus: 2
+    
+    # Restart policy
+    restart: unless-stopped
+    
+    # Network
+    ports:
+      - "8080:8080"  # Optional, for HTTP debugging
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Optional: Add a test runner
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: digital-twin:latest
+    command: python -m pytest tests/ -v
+    volumes:
+      - ./tests:/app/tests:ro
+    depends_on:
+      - digital-twin
+    profiles:
+      - testing
