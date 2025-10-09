@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Digital Twin Test GUI (Clean)</title>
+  <title>Digital Twin Test GUI</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -49,7 +49,7 @@
     .measurement-item { display: flex; flex-direction: column; }
     .measurement-item label { font-weight: bold; margin-bottom: 5px; color: #333; }
     .measurement-item input { padding: 8px; border: 2px solid #ddd; border-radius: 5px; font-size: 16px; }
-    .button-group { display: flex; gap: 15px; justify-content: center; margin-bottom: 30px; }
+    .button-group { display: flex; gap: 15px; justify-content: center; margin-bottom: 30px; flex-wrap: wrap; }
     button {
       padding: 15px 40px; font-size: 18px; font-weight: bold; border: none; border-radius: 10px; cursor: pointer;
       transition: all 0.3s; display: flex; align-items: center; gap: 10px;
@@ -68,7 +68,7 @@
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     .result-section { background: #f8f9fa; padding: 20px; border-radius: 10px; margin-top: 30px; }
     .result-section h3 { margin-bottom: 15px; color: #333; }
-    .result-content { background: white; padding: 20px; border-radius: 10px; max-height: 400px; overflow-y: auto; }
+    .result-content { background: white; padding: 20px; border-radius: 10px; max-height: 600px; overflow-y: auto; }
     .success-message { background: #d4edda; color: #155724; padding: 15px; border-radius: 10px; margin-bottom: 15px; border: 1px solid #c3e6cb; }
     .error-message { background: #f8d7da; color: #721c24; padding: 15px; border-radius: 10px; margin-bottom: 15px; border: 1px solid #f5c6cb; }
     .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-top: 15px; }
@@ -80,103 +80,147 @@
     .instructions h3 { margin-bottom: 10px; color: #333; }
     .instructions ul { margin-left: 20px; color: #555; }
     .instructions li { margin-bottom: 8px; }
+    .footer { text-align: center; margin-top: 40px; padding-top: 20px; border-top: 2px solid #e9ecef; color: #666; }
+    .footer a { color: #667eea; text-decoration: none; }
+    .footer a:hover { text-decoration: underline; }
+    
+    /* Responsive design */
+    @media (max-width: 768px) {
+      .container { padding: 20px; }
+      h1 { font-size: 2em; }
+      .upload-grid { grid-template-columns: 1fr; }
+      .measurement-grid { grid-template-columns: 1fr; }
+      .button-group { flex-direction: column; }
+      button { width: 100%; justify-content: center; }
+    }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>🎭 Digital Twin Test GUI</h1>
-    <p class="subtitle">Upload photos and generate 3D body models</p>
+    <h1>🎭 Digital Twin Generator</h1>
+    <p class="subtitle">AI-Powered 3D Body Model Creation with MediaPipe Pose Detection</p>
 
     <div class="config-section">
       <h3>⚙️ RunPod Configuration</h3>
       <input type="text" id="apiEndpoint" class="config-input"
-             placeholder="Enter RunPod API base (e.g., https://api.runpod.ai/v2/ENDPOINT_ID)" value="">
-      <input type="password" id="apiKey" class="config-input" placeholder="Enter your RunPod API Key" value="">
-      <small style="color:#666">Tip: This clean page uses the <em>async</em> flow. Enter the <strong>base</strong> URL (no /run or /runsync). The app will call <code>/run</code> and poll <code>/status/{jobId}</code> automatically.</small>
+             placeholder="RunPod API endpoint (e.g., https://api.runpod.ai/v2/YOUR_ENDPOINT_ID)" 
+             value="">
+      <input type="password" id="apiKey" class="config-input" 
+             placeholder="RunPod API Key (starts with 'runpod_...')" 
+             value="">
+      <small style="color:#666;">
+        💡 <strong>Tip:</strong> Enter the base URL without /run or /status. 
+        The app will automatically call <code>/run</code> and poll <code>/status/{jobId}</code>.
+        <br>
+        🔗 Get your credentials at <a href="https://runpod.io" target="_blank" style="color:#667eea;">runpod.io</a>
+      </small>
     </div>
 
     <div class="instructions">
-      <h3>📸 Photo Instructions</h3>
+      <h3>📸 Photo Requirements</h3>
       <ul>
-        <li>Take 3 photos: <strong>Front view</strong>, <strong>Side view (90°)</strong>, and <strong>Back view (180°)</strong></li>
-        <li>Stand 2-3 meters from camera with good lighting</li>
-        <li>Wear fitted clothing to show body shape</li>
-        <li>Use plain background if possible</li>
-        <li>Keep camera steady to avoid blur</li>
+        <li><strong>3 Photos Required:</strong> Front view (0°), Side view (90°), Back view (180°)</li>
+        <li><strong>Distance:</strong> Stand 2-3 meters from camera</li>
+        <li><strong>Lighting:</strong> Good, even lighting (avoid harsh shadows)</li>
+        <li><strong>Clothing:</strong> Wear fitted clothing to show body shape</li>
+        <li><strong>Background:</strong> Plain, solid color preferred (improves pose detection)</li>
+        <li><strong>Camera:</strong> Hold steady to avoid blur (minimum 50 sharpness score)</li>
+        <li><strong>Pose:</strong> Stand naturally with arms slightly away from body</li>
       </ul>
     </div>
 
     <div class="upload-grid">
       <div class="upload-card" id="card1">
-        <span class="upload-label">📷 Front View</span>
+        <span class="upload-label">📷 Front View (0°)</span>
         <label for="photo1" class="upload-area" id="preview1">
           <div class="upload-icon">⬆️</div>
           <div>Click to upload photo</div>
+          <small style="color:#999;margin-top:10px;">Face camera directly</small>
         </label>
-        <input type="file" id="photo1" accept="image/*" />
+        <input type="file" id="photo1" accept="image/jpeg,image/png,image/jpg" />
       </div>
 
       <div class="upload-card" id="card2">
-        <span class="upload-label">📷 Side View</span>
+        <span class="upload-label">📷 Side View (90°)</span>
         <label for="photo2" class="upload-area" id="preview2">
           <div class="upload-icon">⬆️</div>
           <div>Click to upload photo</div>
+          <small style="color:#999;margin-top:10px;">Turn 90° to your right</small>
         </label>
-        <input type="file" id="photo2" accept="image/*" />
+        <input type="file" id="photo2" accept="image/jpeg,image/png,image/jpg" />
       </div>
 
       <div class="upload-card" id="card3">
-        <span class="upload-label">📷 Back View</span>
+        <span class="upload-label">📷 Back View (180°)</span>
         <label for="photo3" class="upload-area" id="preview3">
           <div class="upload-icon">⬆️</div>
           <div>Click to upload photo</div>
+          <small style="color:#999;margin-top:10px;">Face away from camera</small>
         </label>
-        <input type="file" id="photo3" accept="image/*" />
+        <input type="file" id="photo3" accept="image/jpeg,image/png,image/jpg" />
       </div>
     </div>
 
     <div class="measurements">
       <h3>📏 Body Measurements</h3>
+      <p style="margin-bottom:15px;color:#666;">
+        Enter your measurements for better accuracy. Default values are based on average adult proportions.
+      </p>
       <div class="measurement-grid">
         <div class="measurement-item">
           <label>Height (cm)</label>
-          <input type="number" id="height" value="170" min="140" max="210">
+          <input type="number" id="height" value="170" min="140" max="210" step="1">
         </div>
         <div class="measurement-item">
           <label>Weight (kg)</label>
-          <input type="number" id="weight" value="70" min="40" max="150">
+          <input type="number" id="weight" value="70" min="40" max="150" step="1">
         </div>
         <div class="measurement-item">
           <label>Shoulder Width (cm)</label>
-          <input type="number" id="shoulder" value="40" min="30" max="60">
+          <input type="number" id="shoulder" value="40" min="30" max="60" step="1">
         </div>
         <div class="measurement-item">
-          <label>Chest (cm)</label>
-          <input type="number" id="chest" value="90" min="70" max="140">
+          <label>Chest Circumference (cm)</label>
+          <input type="number" id="chest" value="90" min="70" max="140" step="1">
         </div>
         <div class="measurement-item">
-          <label>Waist (cm)</label>
-          <input type="number" id="waist" value="80" min="60" max="130">
+          <label>Waist Circumference (cm)</label>
+          <input type="number" id="waist" value="80" min="60" max="130" step="1">
         </div>
         <div class="measurement-item">
-          <label>Hips (cm)</label>
-          <input type="number" id="hips" value="95" min="70" max="140">
+          <label>Hip Circumference (cm)</label>
+          <input type="number" id="hips" value="95" min="70" max="140" step="1">
         </div>
       </div>
     </div>
 
     <div class="button-group">
-      <button class="btn-secondary" id="analyzeBtn">🔍 Analyze Photo Quality</button>
-      <button class="btn-primary" id="generateBtn" disabled>🎯 Generate Digital Twin</button>
+      <button class="btn-secondary" id="analyzeBtn">
+        🔍 Analyze Photo Quality
+      </button>
+      <button class="btn-primary" id="generateBtn" disabled>
+        🎯 Generate Digital Twin
+      </button>
     </div>
 
     <div class="result-section" id="resultSection" style="display:none;">
       <h3>📊 Results</h3>
       <div class="result-content" id="resultContent"></div>
     </div>
+
+    <div class="footer">
+      <p>
+        <strong>Digital Twin Generator</strong> | 
+        Powered by <a href="https://runpod.io" target="_blank">RunPod</a> | 
+        Uses <a href="https://google.github.io/mediapipe/" target="_blank">MediaPipe</a> Pose Detection
+      </p>
+      <p style="margin-top:10px;font-size:12px;">
+        💡 Open browser console (F12) to see detailed processing logs
+      </p>
+    </div>
   </div>
 
-  <!-- Only one script include: async app.js handles everything -->
+  <!-- Main application script -->
   <script src="app.js" defer></script>
 </body>
 </html>
