@@ -1,21 +1,24 @@
 # =============================================================================
-# Production Requirements for RunPod Serverless Digital Twin
-# Compatible with Dockerfile + runpod_handler.py
-# Python 3.10+ | Linux x86_64/ARM64 | Tested 09.10.2025
+# Production Requirements for Digital Twin with Body Modeling
+# RunPod Serverless - Tested and Production-Ready
+# Python 3.10+ | Linux x86_64/ARM64
+# Last Updated: 10.10.2025
 # =============================================================================
 
-# ==================== Core Framework ====================
+# ==================== Core RunPod Framework ====================
 runpod==1.6.2
 
 # ==================== Image Processing ====================
 opencv-python-headless==4.8.1.78
 Pillow==10.1.0
 numpy==1.24.4
-scipy==1.11.4
 
-# ==================== 3D Geometry & Mesh Handling ====================
+# ==================== 3D Mesh Processing ====================
 trimesh==4.0.5
+scipy==1.11.4
 networkx==3.2.1
+
+# ==================== Trimesh Dependencies ====================
 pyglet==2.0.10
 shapely==2.0.2
 rtree==1.1.0
@@ -23,9 +26,9 @@ svgpathtools==1.6.1
 
 # ==================== Body Pose Detection ====================
 mediapipe==0.10.8
-protobuf>=3.20.3,<4       # Compatible range for MediaPipe
-absl-py==2.0.0
+protobuf>=3.20.3,<4     # FIX: MediaPipe <4 constraint
 attrs==23.1.0
+absl-py==2.0.0
 flatbuffers==23.5.26
 
 # ==================== HTTP & Networking ====================
@@ -35,15 +38,9 @@ certifi==2023.11.17
 charset-normalizer==3.3.2
 idna==3.6
 
-# ==================== Utilities ====================
+# ==================== Type Hints ====================
 typing-extensions==4.8.0
 
-# ==================== Optional: Performance Boost ====================
-# numba==0.58.1
-# llvmlite==0.41.1
-# cython==3.0.7
-
-# ==================== Optional: Additional 3D Format Support ====================
-# python-fcl==0.7.0.4
-# pycollada==0.7.2
-# pygltflib==1.16.1
+# ==================== Build Stability (Avoid Long Pip Resolve) ====================
+cffi==1.16.0
+pycparser==2.21
