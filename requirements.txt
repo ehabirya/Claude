@@ -1,122 +1,49 @@
 # =============================================================================
-# Production Requirements for Digital Twin with Body Modeling
-# RunPod Serverless - Tested and Production-Ready
-# Python 3.10+ | Linux x86_64/ARM64
-# Last Updated: 09.10.2025
+# Production Requirements for RunPod Serverless Digital Twin
+# Compatible with Dockerfile + runpod_handler.py
+# Python 3.10+ | Linux x86_64/ARM64 | Tested 09.10.2025
 # =============================================================================
 
-# ==================== Core RunPod Framework ====================
+# ==================== Core Framework ====================
 runpod==1.6.2
 
 # ==================== Image Processing ====================
-# OpenCV without GUI dependencies (headless)
 opencv-python-headless==4.8.1.78
-
-# Image manipulation and format handling
 Pillow==10.1.0
-
-# Numerical computing foundation
 numpy==1.24.4
-
-# ==================== 3D Mesh Processing ====================
-# 3D mesh manipulation library
-trimesh==4.0.5
-
-# Scientific computing (spatial operations, Delaunay triangulation)
 scipy==1.11.4
 
-# Graph theory for mesh topology
+# ==================== 3D Geometry & Mesh Handling ====================
+trimesh==4.0.5
 networkx==3.2.1
-
-# ==================== Trimesh Dependencies ====================
-# 3D rendering engine
 pyglet==2.0.10
-
-# Geometric operations
 shapely==2.0.2
-
-# Spatial indexing
 rtree==1.1.0
-
-# SVG path handling (optional but recommended)
 svgpathtools==1.6.1
 
-# PNG/image export support
-pillow==10.1.0
-
 # ==================== Body Pose Detection ====================
-# Google MediaPipe for pose estimation
 mediapipe==0.10.8
-
-# MediaPipe protocol buffers
-protobuf==4.25.1
-
-# MediaPipe attributes library
-attrs==23.1.0
-
-# MediaPipe abseil library
+protobuf>=3.20.3,<4       # Compatible range for MediaPipe
 absl-py==2.0.0
-
-# Flatbuffers for MediaPipe
+attrs==23.1.0
 flatbuffers==23.5.26
 
-# ==================== Math & Transformations ====================
-# Already included in scipy/numpy, but explicit for clarity:
-# - Linear algebra: numpy.linalg
-# - Spatial transformations: scipy.spatial
-# - Rotation matrices: scipy.spatial.transform
-
 # ==================== HTTP & Networking ====================
-# HTTP requests for RunPod communication
 requests==2.31.0
-
-# URL handling
 urllib3==2.1.0
-
-# Certificate verification
 certifi==2023.11.17
-
-# Character encoding detection
 charset-normalizer==3.3.2
-
-# HTTP identifiers
 idna==3.6
 
-# ==================== Serialization & Data ====================
-# Already included in Python stdlib, but dependencies use it:
-# - json (stdlib)
-# - base64 (stdlib)
-# - io (stdlib)
-
-# ==================== Logging & Debugging ====================
-# Already included in Python stdlib:
-# - logging (stdlib)
-# - traceback (stdlib)
-
-# ==================== Type Hints ====================
+# ==================== Utilities ====================
 typing-extensions==4.8.0
 
-# ==================== Performance Optimization (Optional) ====================
-# Uncomment for production optimization
-# numba==0.58.1              # JIT compilation for numerical code
-# llvmlite==0.41.1           # Required by numba
-# cython==3.0.7              # C extensions for performance
+# ==================== Optional: Performance Boost ====================
+# numba==0.58.1
+# llvmlite==0.41.1
+# cython==3.0.7
 
-# ==================== Additional Mesh Format Support (Optional) ====================
-# Uncomment if you need to support more 3D formats
-# python-fcl==0.7.0.4        # Fast collision library
-# pycollada==0.7.2           # COLLADA format support
-# pygltflib==1.16.1          # glTF/GLB format support
-
-# ==================== Testing & Development (Optional) ====================
-# Uncomment for local development and testing
-# pytest==7.4.3              # Testing framework
-# pytest-cov==4.1.0          # Coverage reports
-# black==23.12.1             # Code formatting
-# flake8==6.1.0              # Linting
-# mypy==1.7.1                # Type checking
-# ipython==8.18.1            # Interactive shell
-
-# ==================== Security Updates ====================
-# Ensure no known vulnerabilities
-# Run: pip-audit or safety check
+# ==================== Optional: Additional 3D Format Support ====================
+# python-fcl==0.7.0.4
+# pycollada==0.7.2
+# pygltflib==1.16.1
