@@ -1,0 +1,17 @@
+# 1. Build
+chmod +x build-local.sh
+./build-local.sh
+
+# 2. Test locally with docker-compose
+docker-compose up -d
+docker-compose logs -f
+
+# 3. Test a request
+docker exec digital-twin-handler python -c "
+from runpod_handler import handler
+result = handler({'input': {'action': 'analyze_photo'}})
+print(result)
+"
+
+# 4. Clean up
+docker-compose down
