@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+env/
+venv/
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Documentation
+*.md
+docs/
+examples/
+tests/
+
+# Build artifacts
+*.log
+*.tmp
+tmp/
+
+# Don't ignore these
+!requirements.txt
+!runpod_handler.py
+!Dockerfile
