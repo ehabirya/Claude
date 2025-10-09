@@ -1,4 +1,4 @@
-// app.js — Async RunPod variant (uses /run + /status polling)
+// app.js – Async RunPod variant with enhanced error handling
 document.addEventListener('DOMContentLoaded', () => {
   // -------------------- Globals --------------------
   let photoData = [null, null, null];
@@ -27,15 +27,19 @@ document.addEventListener('DOMContentLoaded', () => {
     base = base.replace(/\/+$/, '');
     const runUrl = `${base}/run`;
     const statusUrl = `${base}/status`;
+    console.log('📍 Derived routes:', { runUrl, statusUrl });
     return { runUrl, statusUrl };
   }
 
   function parseRunpodResponse(raw) {
+    console.log('📦 Parsing response:', raw);
     return raw?.output?.[0]?.output ?? raw?.output ?? raw;
   }
 
   function extractJobId(raw) {
-    return raw?.id || raw?.jobId || raw?.requestId || raw?.output?.id || raw?.[0]?.id || null;
+    const jobId = raw?.id || raw?.jobId || raw?.requestId || raw?.output?.id || raw?.[0]?.id || null;
+    console.log('🆔 Extracted job ID:', jobId);
+    return jobId;
   }
 
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -49,11 +53,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let delay = startDelayMs;
     const started = Date.now();
+    let pollCount = 0;
+
+    console.log(`🔄 Starting to poll job ${jobId}...`);
 
     while (true) {
-      if (Date.now() - started > timeoutMs) {
-        throw new Error('Polling timeout exceeded');
+      pollCount++;
+      const elapsed = Date.now() - started;
+      
+      if (elapsed > timeoutMs) {
+        throw new Error(`Polling timeout exceeded after ${Math.round(elapsed/1000)}s`);
       }
+
+      console.log(`🔄 Poll #${pollCount} (${Math.round(elapsed/1000)}s elapsed)`);
 
       const res = await fetch(`${statusUrl}/${encodeURIComponent(jobId)}`, {
         method: 'GET',
@@ -66,13 +78,25 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       const json = await res.json();
+      console.log('📥 Poll response:', json);
+      
       const status = json?.status || json?.state || json?.job?.status;
+      console.log(`📊 Job status: ${status}`);
+
       if (status === 'COMPLETED' || status === 'SUCCEEDED' || status === 'SUCCESS') {
+        console.log('✅ Job completed successfully!');
         return parseRunpodResponse(json);
       }
+      
       if (status === 'FAILED' || status === 'CANCELLED' || status === 'CANCELED' || status === 'ERROR') {
         const msg = json?.error || json?.message || 'Job failed';
+        console.error('❌ Job failed:', msg);
         throw new Error(msg);
+      }
+
+      // Show progress in UI if available
+      if (json?.progress) {
+        console.log(`⏳ Progress: ${json.progress}`);
       }
 
       await wait(delay);
@@ -108,7 +132,9 @@ document.addEventListener('DOMContentLoaded', () => {
           canvas.height = height;
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, width, height);
-          resolve(canvas.toDataURL(mime, quality));
+          const dataUrl = canvas.toDataURL(mime, quality);
+          console.log(`📸 Image resized to ${width}x${height} (${estimateBase64KB(dataUrl)} KB)`);
+          resolve(dataUrl);
         };
         img.onerror = reject;
         img.src = e.target.result;
@@ -141,6 +167,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const file = e.target.files?.[0];
       if (!file) return;
 
+      console.log(`📁 Processing photo ${i}:`, file.name, file.type, file.size);
+
       try {
         const dataUrl = await fileToResizedDataURL(file);
         photoData[i - 1] = dataUrl;
@@ -153,6 +181,7 @@ document.addEventListener('DOMContentLoaded', () => {
         card.classList.add('has-image');
         updateGenerateButton();
       } catch (err) {
+        console.error(`❌ Upload failed for photo ${i}:`, err);
         preview.innerHTML = `<div style="color:#dc3545">Upload failed: ${err?.message || err}</div>`;
       }
     });
@@ -180,20 +209,30 @@ document.addEventListener('DOMContentLoaded', () => {
     return new Promise((resolve, reject) => {
       const s = document.createElement('script');
       s.src = src;
-      s.onload = resolve;
-      s.onerror = reject;
+      s.onload = () => {
+        console.log(`✅ Loaded: ${src}`);
+        resolve();
+      };
+      s.onerror = () => {
+        console.error(`❌ Failed to load: ${src}`);
+        reject(new Error(`Failed to load ${src}`));
+      };
       document.head.appendChild(s);
     });
   }
+
   async function ensureThree() {
     if (window.THREE && window.THREE.OBJLoader) return;
+    console.log('📦 Loading Three.js...');
     if (!window.THREE) {
       await loadScript('https://unpkg.com/three@0.158.0/build/three.min.js');
     }
     if (!window.THREE?.OBJLoader) {
       await loadScript('https://unpkg.com/three@0.158.0/examples/js/loaders/OBJLoader.js');
     }
+    console.log('✅ Three.js loaded successfully');
   }
+
   function showObjInViewer(objText) {
     const container = document.getElementById('viewer');
     if (!container) return;
@@ -201,6 +240,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const h = 420;
 
     const init = () => {
+      console.log('🎨 Initializing 3D viewer...');
       const scene = new THREE.Scene();
       const camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 1000);
       const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -239,6 +279,8 @@ document.addEventListener('DOMContentLoaded', () => {
         camera.aspect = w2 / h;
         camera.updateProjectionMatrix();
       });
+
+      console.log('✅ 3D viewer initialized');
     };
 
     if (window.THREE && window.THREE.OBJLoader) {
@@ -249,7 +291,9 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
   }
+
   function downloadMesh(base64Data) {
+    console.log('💾 Downloading mesh...');
     const objData = atob(base64Data);
     showObjInViewer(objData);
     const blob = new Blob([objData], { type: 'text/plain' });
@@ -261,10 +305,12 @@ document.addEventListener('DOMContentLoaded', () => {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    console.log('✅ Mesh downloaded');
   }
   window.downloadMesh = downloadMesh;
 
   function showSuccessResult(result) {
+    console.log('🎉 Showing success result:', result);
     const section = document.getElementById('resultSection');
     const content = document.getElementById('resultContent');
     if (!section || !content) return;
@@ -278,7 +324,8 @@ document.addEventListener('DOMContentLoaded', () => {
       <div class="stats-grid">
         <div class="stat-item"><div class="stat-value">${stats.num_vertices ?? '-'}</div><div class="stat-label">Vertices</div></div>
         <div class="stat-item"><div class="stat-value">${stats.num_faces ?? '-'}</div><div class="stat-label">Faces</div></div>
-        <div class="stat-item"><div class="stat-value">${stats.num_matches ?? '-'}</div><div class="stat-label">Matches</div></div>
+        <div class="stat-item"><div class="stat-value">${stats.landmarks_count ?? '-'}</div><div class="stat-label">Pose Landmarks</div></div>
+        <div class="stat-item"><div class="stat-value">${stats.pose_detected ? 'Yes' : 'No'}</div><div class="stat-label">Pose Detected</div></div>
       </div>
       <div id="viewer" style="margin-top:20px;height:420px;background:#000;border-radius:10px;"></div>
       <div style="margin-top:20px;">
@@ -302,11 +349,14 @@ document.addEventListener('DOMContentLoaded', () => {
   // -------------------- Analyze (Async) --------------------
   const analyzeBtn = document.getElementById('analyzeBtn');
   analyzeBtn?.addEventListener('click', async () => {
+    console.log('🔍 Starting photo analysis...');
     const { apiEndpoint, apiKey } = getCreds();
+    
     if (!/^https?:\/\//i.test(apiEndpoint) || !apiKey) {
-      alert('Please enter a valid RunPod API endpoint (e.g., https://api.runpod.ai/v2/ENDPOINT_ID) and API key');
+      alert('Please enter a valid RunPod API endpoint and API key');
       return;
     }
+    
     const routes = deriveRoutes(apiEndpoint);
     if (!routes.runUrl || !routes.statusUrl) {
       alert('Could not derive /run and /status routes from the endpoint.');
@@ -319,13 +369,15 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    analyzeBtn.innerHTML = '<div class="spinner"></div> Queuing & analyzing...';
+    analyzeBtn.innerHTML = '<div class="spinner"></div> Analyzing...';
     analyzeBtn.disabled = true;
     clearQualityUI();
 
     try {
       for (let i = 0; i < 3; i++) {
         if (!photoData[i]) continue;
+
+        console.log(`🔍 Analyzing photo ${i + 1}...`);
 
         // submit
         const submit = await fetch(routes.runUrl, {
@@ -350,6 +402,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const final = await pollStatus(routes.statusUrl, jobId, apiKey);
         const result = parseRunpodResponse(final);
 
+        console.log(`✅ Photo ${i + 1} analysis complete:`, result);
+
         const card = document.getElementById(`card${i + 1}`);
         const preview = document.getElementById(`preview${i + 1}`);
         if (!card || !preview) continue;
@@ -367,7 +421,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const issues = asArray(result.issues);
         if (result.is_good) {
           card.classList.remove('quality-bad');
-          preview.innerHTML += `<span class="quality-badge quality-good">✓ Good Quality</span>`;
+          let badge = `<span class="quality-badge quality-good">✓ Good Quality</span>`;
+          if (result.pose_detected) {
+            badge += `<br><small style="color:#28a745">✓ Pose detected (${result.pose_landmarks_count} landmarks)</small>`;
+          }
+          preview.innerHTML += badge;
         } else {
           card.classList.add('quality-bad');
           const issuesHtml = issues.map((x) => `• ${x}`).join('<br>');
@@ -380,6 +438,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       showResult('success', 'Photo quality analysis complete!');
     } catch (err) {
+      console.error('❌ Analysis error:', err);
       showResult('error', `Error analyzing photos: ${err.message}`);
     } finally {
       analyzeBtn.innerHTML = '🔍 Analyze Photo Quality';
@@ -390,11 +449,14 @@ document.addEventListener('DOMContentLoaded', () => {
   // -------------------- Generate (Async) --------------------
   const generateBtn = document.getElementById('generateBtn');
   generateBtn?.addEventListener('click', async () => {
+    console.log('🎯 Starting twin generation...');
     const { apiEndpoint, apiKey } = getCreds();
+    
     if (!/^https?:\/\//i.test(apiEndpoint) || !apiKey) {
-      alert('Please enter a valid RunPod API endpoint (e.g., https://api.runpod.ai/v2/ENDPOINT_ID) and API key');
+      alert('Please enter a valid RunPod API endpoint and API key');
       return;
     }
+    
     const routes = deriveRoutes(apiEndpoint);
     if (!routes.runUrl || !routes.statusUrl) {
       alert('Could not derive /run and /status routes from the endpoint.');
@@ -402,19 +464,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const measurements = {
-      height: parseInt(document.getElementById('height')?.value),
-      weight: parseInt(document.getElementById('weight')?.value),
-      shoulderWidth: parseInt(document.getElementById('shoulder')?.value),
-      chestCircumference: parseInt(document.getElementById('chest')?.value),
-      waistCircumference: parseInt(document.getElementById('waist')?.value),
-      hipCircumference: parseInt(document.getElementById('hips')?.value),
+      height: parseFloat(document.getElementById('height')?.value),
+      weight: parseFloat(document.getElementById('weight')?.value),
+      shoulderWidth: parseFloat(document.getElementById('shoulder')?.value),
+      chestCircumference: parseFloat(document.getElementById('chest')?.value),
+      waistCircumference: parseFloat(document.getElementById('waist')?.value),
+      hipCircumference: parseFloat(document.getElementById('hips')?.value),
     };
 
-    generateBtn.innerHTML = '<div class="spinner"></div> Queued… generating digital twin...';
+    console.log('📏 Measurements:', measurements);
+
+    generateBtn.innerHTML = '<div class="spinner"></div> Generating digital twin...';
     generateBtn.disabled = true;
 
     try {
       // submit
+      console.log('📤 Submitting generation request...');
       const submit = await fetch(routes.runUrl, {
         method: 'POST',
         headers: {
@@ -436,8 +501,10 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!jobId) throw new Error('No job id returned from /run');
 
       // poll
-      const final = await pollStatus(routes.statusUrl, jobId, apiKey, { timeoutMs: 300000 }); // allow up to 5 min
+      const final = await pollStatus(routes.statusUrl, jobId, apiKey, { timeoutMs: 300000 });
       const result = parseRunpodResponse(final);
+
+      console.log('📊 Final result:', result);
 
       if (result?.success) {
         showSuccessResult(result);
@@ -446,6 +513,7 @@ document.addEventListener('DOMContentLoaded', () => {
         showResult('error', message);
       }
     } catch (err) {
+      console.error('❌ Generation error:', err);
       showResult('error', `Error: ${err.message}`);
     } finally {
       generateBtn.innerHTML = '🎯 Generate Digital Twin';
@@ -455,4 +523,5 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // -------------------- Kick things off --------------------
   updateGenerateButton();
+  console.log('✅ App initialized');
 });
