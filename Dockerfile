@@ -2,6 +2,7 @@
 # RunPod Serverless Container for Digital Twin Pose Estimation
 # Python 3.11 slim | Small & Fast | Updated 2025-10-10
 # ============================================================
+FROM python:3
 FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
